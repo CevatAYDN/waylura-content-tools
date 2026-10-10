@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "countryId": "country-tr-turkey",
+  "publicationStatus": "review_required",
+  "places": [
+    {
+      "id": "poi-ant-hadrians-gate",
+      "cityId": "tr-antalya",
+      "countryId": "country-tr-turkey",
+      "name": {
+        "tr": "Hadrian Kapısı (Üçkapılar)",
+        "en": "Hadrian's Gate",
+        "local": "Hadrian Kapısı (Üçkapılar)"
+      },
+      "category": "history",
+      "latitude": 36.8852828,
+      "longitude": 30.7085272,
+      "sourceId": "src-osm-2026-09"
+    },
+    {
+      "id": "poi-ant-kaleici-museum",
+      "cityId": "tr-antalya",
+      "countryId": "country-tr-turkey",
+      "name": {
+        "tr": "Suna & İnan Kıraç Kaleiçi Müzesi",
+        "en": "Suna & İnan Kıraç Kaleiçi Museum",
+        "local": "Suna & İnan Kıraç Kaleiçi Müzesi"
+      },
+      "category": "history",
+      "latitude": 36.8840816,
+      "longitude": 30.7042571,
+      "sourceId": "src-osm-2026-09"
+    }
+  ]
+}

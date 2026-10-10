@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "countryId": "country-bad_format",
+  "places": [
+    {
+      "id": "poi-bad-01",
+      "cityId": "bad-city",
+      "countryId": "country-bad",
+      "name": {
+        "tr": "Hatalı Yer",
+        "en": "Bad Place"
+      },
+      "category": "invalid_category",
+      "latitude": 150.0,
+      "longitude": -200.0,
+      "sourceId": "src-unknown",
+      "canonicalNowCandidateId": "poi-non-existent-candidate"
+    },
+    {
+      "id": "poi-bad-01",
+      "cityId": "bad-city",
+      "countryId": "country-bad",
+      "name": {
+        "tr": "",
+        "en": "Duplicate Place",
+        "local": "Local"
+      },
+      "category": "history",
+      "latitude": 30.0,
+      "longitude": 30.0,
+      "sourceId": "src-unknown"
+    }
+  ]
+}

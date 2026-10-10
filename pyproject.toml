@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "waylura-content-tools"
+version = "1.0.0"
+authors = [
+  { name="Waylura Open Source Contributors" },
+]
+description = "CLI tool for validating, auditing, and repairing structured multilingual travel datasets (JSON)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Text Processing :: Linguistic",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = []
+
+[project.scripts]
+waylura-content-tools = "waylura_content_tools.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["waylura_content_tools*"]

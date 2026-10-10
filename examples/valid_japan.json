@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "countryId": "country-jp-japan",
+  "publicationStatus": "review_required",
+  "places": [
+    {
+      "id": "poi-tky-sensoji",
+      "cityId": "jp-tokyo",
+      "countryId": "country-jp-japan",
+      "name": {
+        "tr": "Sensō-ji Tapınağı",
+        "en": "Sensō-ji",
+        "local": "金龍山 浅草寺"
+      },
+      "category": "history",
+      "latitude": 35.714765,
+      "longitude": 139.796655,
+      "sourceId": "src-osm-2026-09"
+    },
+    {
+      "id": "poi-kyo-kinkakuji",
+      "cityId": "jp-kyoto",
+      "countryId": "country-jp-japan",
+      "name": {
+        "tr": "Kinkaku-ji (Altın Köşk Tapınağı)",
+        "en": "Kinkaku-ji",
+        "local": "金閣寺"
+      },
+      "category": "history",
+      "latitude": 35.03937,
+      "longitude": 135.729243,
+      "sourceId": "src-osm-2026-09"
+    }
+  ]
+}
