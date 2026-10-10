@@ -170,6 +170,33 @@ class ProposerAndFixerTests(unittest.TestCase):
         self.assertEqual(len(res2.applied), 0)
         self.assertFalse(res2.is_changed)
 
+    def test_fixer_rejects_duplicate_poi_id_in_dataset(self):
+        """Fixer must reject dataset with duplicate POI IDs."""
+        corrupted = copy.deepcopy(self.dataset)
+        corrupted["places"].append(copy.deepcopy(corrupted["places"][0]))
+        issues = audit_place_names(corrupted["places"])
+        proposals = generate_proposals(issues)
+
+        res = apply_proposals_safely(corrupted, proposals)
+        self.assertEqual(len(res.applied), 0)
+        self.assertFalse(res.is_changed)
+        self.assertEqual(res.rejections[0]["reason"], "DUPLICATE_POI_ID")
+
+    def test_fixer_rejects_forbidden_fields(self):
+        """Fixer must reject any proposal targeting forbidden fields like id or coordinates."""
+        forbidden_prop = ProposalRecord(
+            poi_id=self.dataset["places"][0]["id"],
+            field="category",
+            current_value="history",
+            proposed_value="food",
+            reason="Forbidden field edit attempt",
+            status="AUTO_SAFE",
+        )
+        res = apply_proposals_safely(self.dataset, [forbidden_prop])
+        self.assertEqual(len(res.applied), 0)
+        self.assertFalse(res.is_changed)
+        self.assertEqual(res.rejections[0]["reason"], "FORBIDDEN_FIELD")
+
 
 if __name__ == "__main__":
     unittest.main()

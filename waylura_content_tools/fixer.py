@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any
 from .proposer import ProposalRecord
 
+ALLOWED_FIX_FIELDS = {"name.tr", "name.en", "name.local"}
+
 
 class FixResult:
     def __init__(
@@ -46,21 +48,41 @@ def apply_proposals_safely(
     """Surgically and idempotently apply safe proposals to dataset in memory.
     
     Strict safety invariants:
-    - Reject stale proposals where proposal.current_value != current_field_value.
-    - Reject conflicting proposals targeting the same POI and field.
-    - Reject non-AUTO_SAFE proposals without explicit, traceable human review confirmation (confirm_review=True).
-    - Never touch place 'id', 'category', 'latitude', 'longitude', 'sourceId', 'provenance'.
+    - Rejects datasets containing duplicate POI IDs.
+    - Rejects modifications to any field outside ALLOWED_FIX_FIELDS ({'name.tr', 'name.en', 'name.local'}).
+    - Rejects stale proposals where proposal.current_value != current_field_value.
+    - Rejects conflicting proposals targeting the same POI and field.
+    - Rejects non-AUTO_SAFE proposals without explicit, traceable human review confirmation (confirm_review=True).
+    - Never touch place 'id', 'category', 'latitude', 'longitude', 'sourceId', 'cityId', 'countryId', 'provenance'.
     - Never alter publicationStatus, editorialReview, or approval flags.
-    - Only modify target string fields in place['name'][subfield].
-    - Maintain zero change if applied count is 0.
+    - Maintains zero change if applied count is 0.
     """
     allow_manual = confirm_review or allow_review_required
     updated_data = copy.deepcopy(data)
     places = updated_data.get("places", [])
     if not isinstance(places, list):
-        return FixResult([], proposals, [{"reason": "places_not_a_list"}], data, False)
+        return FixResult([], proposals, [{"reason": "INVALID_PLACES", "message": "places must be a JSON array"}], data, False)
 
-    # 1. Conflict detection pre-scan across proposals
+    # 1. Identity & Duplicate Key Pre-check
+    seen_ids: set[str] = set()
+    for place in places:
+        if isinstance(place, dict) and "id" in place:
+            p_id = place["id"]
+            if p_id in seen_ids:
+                return FixResult(
+                    [],
+                    proposals,
+                    [{
+                        "reason": "DUPLICATE_POI_ID",
+                        "poi_id": p_id,
+                        "message": f"Duplicate POI ID detected in dataset: {p_id!r}. Fix aborted.",
+                    }],
+                    data,
+                    False,
+                )
+            seen_ids.add(p_id)
+
+    # 2. Conflict detection pre-scan across proposals
     target_proposals: dict[tuple[str, str], list[ProposalRecord]] = {}
     for p in proposals:
         target_proposals.setdefault((p.poi_id, p.field), []).append(p)
@@ -89,7 +111,7 @@ def apply_proposals_safely(
     for prop in proposals:
         key = (prop.poi_id, prop.field)
 
-        # 1. Check for conflicting proposals
+        # A. Check for conflicting proposals
         if key in conflicting_keys:
             reason = f"CONFLICT: Conflicting proposals exist for {prop.poi_id}.{prop.field}"
             skipped.append(prop)
@@ -101,7 +123,7 @@ def apply_proposals_safely(
             })
             continue
 
-        # 2. Check for target POI existence
+        # B. Check for target POI existence
         target_poi = poi_lookup.get(prop.poi_id)
         if target_poi is None:
             reason = f"NOT_FOUND: POI '{prop.poi_id}' not found in dataset"
@@ -114,9 +136,9 @@ def apply_proposals_safely(
             })
             continue
 
-        # 3. Check allowed field constraint: ONLY name.<lang> is permitted
-        if not prop.field.startswith("name."):
-            reason = f"FORBIDDEN_FIELD: Only name.* fields can be modified (attempted {prop.field})"
+        # C. Check allowed field constraint: ONLY ALLOWED_FIX_FIELDS are permitted
+        if prop.field not in ALLOWED_FIX_FIELDS:
+            reason = f"FORBIDDEN_FIELD: Only fields in {sorted(ALLOWED_FIX_FIELDS)} may be modified (attempted {prop.field})"
             skipped.append(prop)
             rejections.append({
                 "poi_id": prop.poi_id,
@@ -141,7 +163,7 @@ def apply_proposals_safely(
 
         current_val = name_obj.get(lang)
 
-        # 4. Stale proposal protection: current value must match prop.current_value exactly
+        # D. Stale proposal protection: current value must match prop.current_value exactly
         if current_val != prop.current_value:
             reason = (
                 f"STALE_PROPOSAL: Current value {current_val!r} does not match proposal "
@@ -158,9 +180,9 @@ def apply_proposals_safely(
             })
             continue
 
-        # 5. Review required protection: non-AUTO_SAFE proposals require explicit human confirmation
+        # E. Review required protection: non-AUTO_SAFE proposals require explicit human confirmation
         if prop.status != "AUTO_SAFE" and not allow_manual:
-            reason = f"REVIEW_REQUIRED: Proposal status '{prop.status}' requires explicit human confirmation"
+            reason = f"REVIEW_REQUIRED: Proposal status '{prop.status}' requires explicit human confirmation (--confirm-review)"
             skipped.append(prop)
             rejections.append({
                 "poi_id": prop.poi_id,
@@ -170,16 +192,16 @@ def apply_proposals_safely(
             })
             continue
 
-        # 6. Idempotency: already has proposed value
+        # F. Idempotency: already has proposed value
         if current_val == prop.proposed_value:
             skipped.append(prop)
             continue
 
-        # 7. Apply surgical edit
+        # G. Apply surgical edit
         name_obj[lang] = prop.proposed_value
         applied.append(prop)
 
-    # 8. Post-verification of safety invariants
+    # 3. Post-verification of safety invariants
     for orig_p in data.get("places", []):
         p_id = orig_p.get("id")
         mod_p = poi_lookup.get(p_id)
@@ -217,10 +239,8 @@ def atomic_write_dataset(
     Returns True if target_path was written/replaced, False if untouched.
     """
     if not is_changed:
-        # Zero changes: preserve file completely
         if target_path.exists():
             return False
-        # If writing to a new target file with 0 changes, write original bytes or dump
         if original_bytes is not None:
             target_path.parent.mkdir(parents=True, exist_ok=True)
             target_path.write_bytes(original_bytes)

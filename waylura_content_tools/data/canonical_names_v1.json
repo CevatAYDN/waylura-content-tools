@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "dataVersion": "1.0.0",
+  "dataVersion": "1.1.0",
   "lastUpdated": "2026-10-10",
-  "description": "Versioned canonical travel landmark and monument names with official source attributions.",
+  "description": "Versioned canonical travel landmark and monument names with verified official source citations, URLs, and evidence records.",
   "entities": {
     "poi-tky-sensoji": {
       "names": {
@@ -10,8 +10,11 @@
         "en": "Sensō-ji",
         "local": "金龍山 浅草寺"
       },
-      "source": "JNTO (Japan National Tourism Organization) / Tokyo Metropolitan Tourism",
-      "status": "OFFICIAL_VERIFIED"
+      "source": "JNTO (Japan National Tourism Organization)",
+      "sourceUrl": "https://www.japan.travel/en/spot/1726/",
+      "evidence": "Official JNTO destination register documents 'Sensō-ji Temple' (Asakusa, Tokyo, 金龍山 浅草寺).",
+      "verificationStatus": "OFFICIAL_VERIFIED",
+      "version": "1.1.0"
     },
     "poi-kyo-kinkakuji": {
       "names": {
@@ -19,8 +22,11 @@
         "en": "Kinkaku-ji",
         "local": "金閣寺"
       },
-      "source": "Rinzai Zen Shokoku-ji branch / JNTO Kyoto Guide",
-      "status": "OFFICIAL_VERIFIED"
+      "source": "UNESCO World Heritage Centre / Shokoku-ji Religious Committee",
+      "sourceUrl": "https://whc.unesco.org/en/list/688/",
+      "evidence": "UNESCO Historic Monuments of Ancient Kyoto listing includes Rokuon-ji (commonly Kinkaku-ji, 金閣寺).",
+      "verificationStatus": "OFFICIAL_VERIFIED",
+      "version": "1.1.0"
     },
     "poi-kyo-ginkakuji": {
       "names": {
@@ -28,8 +34,11 @@
         "en": "Ginkaku-ji",
         "local": "銀閣寺"
       },
-      "source": "JNTO Kyoto Tourism Guide / Agency for Cultural Affairs (Bunkacho)",
-      "status": "OFFICIAL_VERIFIED"
+      "source": "UNESCO World Heritage Centre / Agency for Cultural Affairs (Bunkacho)",
+      "sourceUrl": "https://whc.unesco.org/en/list/688/",
+      "evidence": "UNESCO Historic Monuments of Ancient Kyoto listing includes Jisho-ji (commonly Ginkaku-ji, 銀閣寺).",
+      "verificationStatus": "OFFICIAL_VERIFIED",
+      "version": "1.1.0"
     },
     "poi-kyo-ninnaji": {
       "names": {
@@ -37,9 +46,12 @@
         "en": "Ninna-ji",
         "local": "仁和寺"
       },
-      "notes": "Canonical English is Ninna-ji; 'Ninna temple' is raw literal translation",
-      "source": "UNESCO World Heritage / Ninna-ji Official / JNTO",
-      "status": "OFFICIAL_VERIFIED"
+      "notes": "Canonical English is Ninna-ji; 'Ninna temple' is raw literal scraping",
+      "source": "UNESCO World Heritage Centre / Ninna-ji Official",
+      "sourceUrl": "https://whc.unesco.org/en/list/688/",
+      "evidence": "UNESCO listing documents 'Ninna-ji (仁和寺)'. Literal translation 'Ninna temple' lacks official standing.",
+      "verificationStatus": "OFFICIAL_VERIFIED",
+      "version": "1.1.0"
     },
     "poi-kyo-toji": {
       "names": {
@@ -47,9 +59,12 @@
         "en": "Tō-ji",
         "local": "東寺"
       },
-      "notes": "Canonical English is Tō-ji; 'East Temple' is raw literal translation",
-      "source": "UNESCO World Heritage / Tō-ji Shingon Sect / JNTO",
-      "status": "OFFICIAL_VERIFIED"
+      "notes": "Canonical English is Tō-ji; 'East Temple' is raw literal scraping",
+      "source": "UNESCO World Heritage Centre / Tō-ji Shingon Sect",
+      "sourceUrl": "https://whc.unesco.org/en/list/688/",
+      "evidence": "UNESCO listing documents 'Tō-ji (Kyō-ō-gokoku-ji, 東寺)'. Literal translation 'East Temple' lacks official standing.",
+      "verificationStatus": "OFFICIAL_VERIFIED",
+      "version": "1.1.0"
     },
     "poi-kyo-sanjusangendo": {
       "names": {
@@ -57,8 +72,11 @@
         "en": "Sanjūsangen-dō",
         "local": "三十三間堂"
       },
-      "source": "JNTO / Kyoto Tourism Official Guide",
-      "status": "OFFICIAL_VERIFIED"
+      "source": "Kyoto City Official Travel Guide",
+      "sourceUrl": "https://kyoto.travel/en/see-and-do/sanjusangendo.html",
+      "evidence": "Official Kyoto City destination directory documents 'Sanjūsangen-dō (三十三間堂)' with macron.",
+      "verificationStatus": "OFFICIAL_VERIFIED",
+      "version": "1.1.0"
     },
     "poi-ayt-hadrians-gate": {
       "aliases": ["poi-ant-hadrians-gate"],
@@ -67,8 +85,11 @@
         "en": "Hadrian's Gate",
         "local": "Hadrian Kapısı (Üçkapılar)"
       },
-      "source": "T.C. Kültür ve Turizm Bakanlığı Antalya İl Kültür Müdürlüğü",
-      "status": "OFFICIAL_VERIFIED"
+      "source": "T.C. Kültür ve Turizm Bakanlığı Antalya İl Kültür ve Turizm Müdürlüğü",
+      "sourceUrl": "https://antalya.ktb.gov.tr/TR-68257/hadrian-kapisi-uckapilar.html",
+      "evidence": "Official T.C. Kültür ve Turizm Bakanlığı directory entry: 'Hadrian Kapısı (Üçkapılar)'.",
+      "verificationStatus": "OFFICIAL_VERIFIED",
+      "version": "1.1.0"
     },
     "poi-ayt-suna-inan-kirac-kaleici-museum": {
       "aliases": ["poi-ant-kaleici-museum"],
@@ -78,7 +99,10 @@
         "local": "Suna & İnan Kıraç Kaleiçi Müzesi"
       },
       "source": "AKMED / Koç Üniversitesi Vehbi Koç Vakfı",
-      "status": "OFFICIAL_VERIFIED"
+      "sourceUrl": "https://akmed.ku.edu.tr/en/kaleici-museum/",
+      "evidence": "Official AKMED museum registration documents 'Suna & İnan Kıraç Kaleiçi Museum'.",
+      "verificationStatus": "OFFICIAL_VERIFIED",
+      "version": "1.1.0"
     },
     "poi-ayt-antalya-museum": {
       "aliases": ["poi-ant-archaeology-museum"],
@@ -88,7 +112,10 @@
         "local": "Antalya Arkeoloji Müzesi"
       },
       "source": "T.C. Kültür ve Turizm Bakanlığı Müzeler Genel Müdürlüğü",
-      "status": "OFFICIAL_VERIFIED"
+      "sourceUrl": "https://muze.gov.tr/muze-detay?SectionId=ANT01&DistId=ANT",
+      "evidence": "Official T.C. Müzeler Genel Müdürlüğü directory: 'Antalya Müzesi (Arkeoloji Müzesi)'.",
+      "verificationStatus": "OFFICIAL_VERIFIED",
+      "version": "1.1.0"
     },
     "poi-ayt-ataturk-house-museum": {
       "aliases": ["poi-ant-ataturk-house"],
@@ -98,7 +125,10 @@
         "local": "Antalya Atatürk Evi Müzesi"
       },
       "source": "T.C. Kültür ve Turizm Bakanlığı",
-      "status": "OFFICIAL_VERIFIED"
+      "sourceUrl": "https://antalya.ktb.gov.tr/TR-68253/ataturk-evi-ve-muzesi.html",
+      "evidence": "Official registry entry: 'Antalya Atatürk Evi ve Müzesi'.",
+      "verificationStatus": "OFFICIAL_VERIFIED",
+      "version": "1.1.0"
     }
   }
 }

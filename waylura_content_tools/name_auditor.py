@@ -15,7 +15,7 @@ DATA_PATH = Path(__file__).resolve().parent / "data" / "canonical_names_v1.json"
 
 
 def load_canonical_registry() -> dict[str, dict[str, Any]]:
-    """Load canonical dictionary with aliases and source provenance."""
+    """Load canonical dictionary with aliases, URL proofs, and source provenance."""
     if not DATA_PATH.is_file():
         return {}
     try:
@@ -64,6 +64,9 @@ class NameAuditIssue:
         proposed_value: str | None = None,
         review_required: bool = False,
         source: str | None = None,
+        source_url: str | None = None,
+        evidence: str | None = None,
+        classification: str = "SEMANTIC_NAME_CHANGE",  # 'MECHANICAL_NORMALIZATION' or 'SEMANTIC_NAME_CHANGE'
     ):
         self.severity = severity
         self.issue_type = issue_type
@@ -74,6 +77,9 @@ class NameAuditIssue:
         self.proposed_value = proposed_value
         self.review_required = review_required
         self.source = source
+        self.source_url = source_url
+        self.evidence = evidence
+        self.classification = classification
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -86,10 +92,29 @@ class NameAuditIssue:
             "proposedValue": self.proposed_value,
             "reviewRequired": self.review_required,
             "source": self.source,
+            "sourceUrl": self.source_url,
+            "evidence": self.evidence,
+            "classification": self.classification,
         }
 
     def __repr__(self) -> str:
         return f"<{self.severity}: {self.issue_type} on {self.poi_id}.{self.field} - {self.message}>"
+
+
+def is_record_evidence_complete(record: dict[str, Any] | None) -> bool:
+    """Verify that canonical entity record has authoritative URL and citation evidence."""
+    if not record or not isinstance(record, dict):
+        return False
+    status = record.get("verificationStatus")
+    url = record.get("sourceUrl")
+    evidence = record.get("evidence")
+    if status != "OFFICIAL_VERIFIED":
+        return False
+    if not url or not isinstance(url, str) or not url.startswith("https://"):
+        return False
+    if not evidence or not isinstance(evidence, str) or len(evidence.strip()) < 10:
+        return False
+    return True
 
 
 def audit_place_names(places: list[dict[str, Any]]) -> list[NameAuditIssue]:
@@ -100,7 +125,6 @@ def audit_place_names(places: list[dict[str, Any]]) -> list[NameAuditIssue]:
         poi_id = place.get("id") or "unknown"
         city_id = place.get("cityId") or ""
         country_id = place.get("countryId") or ""
-        is_japan = "jp" in country_id or city_id.startswith("jp-")
 
         name = place.get("name")
         if not isinstance(name, dict):
@@ -109,6 +133,9 @@ def audit_place_names(places: list[dict[str, Any]]) -> list[NameAuditIssue]:
         canonical_record = CANONICAL_REGISTRY.get(poi_id)
         canonical_names = canonical_record.get("names", {}) if canonical_record else {}
         canonical_source = canonical_record.get("source") if canonical_record else None
+        canonical_url = canonical_record.get("sourceUrl") if canonical_record else None
+        canonical_evidence = canonical_record.get("evidence") if canonical_record else None
+        has_complete_evidence = is_record_evidence_complete(canonical_record)
 
         for lang in ("tr", "en", "local"):
             val = name.get(lang)
@@ -124,11 +151,12 @@ def audit_place_names(places: list[dict[str, Any]]) -> list[NameAuditIssue]:
                         field=field_name,
                         current_value=str(val),
                         review_required=True,
+                        classification="SEMANTIC_NAME_CHANGE",
                     )
                 )
                 continue
 
-            # 1. Unicode NFC normalization check
+            # 1. Unicode NFC normalization check (Strictly Mechanical)
             if not is_nfc(val):
                 normalized = normalize_nfc(val)
                 issues.append(
@@ -141,16 +169,17 @@ def audit_place_names(places: list[dict[str, Any]]) -> list[NameAuditIssue]:
                         current_value=val,
                         proposed_value=normalized,
                         review_required=False,
+                        classification="MECHANICAL_NORMALIZATION",
                     )
                 )
 
-            # 2. Cyrillic script leakage check
-            # Cyrillic in Turkish, English, or Japanese places is an anomaly/scraping artifact
+            # 2. Cyrillic script leakage check (Semantic / Scraping artifact)
             if contains_cyrillic(val):
-                # If city is not in a Cyrillic locale, this is foreign leakage
                 is_cyrillic_locale = "ru" in country_id or "ua" in country_id or "bg" in country_id
                 if not is_cyrillic_locale or lang in ("tr", "en"):
                     proposed = canonical_names.get(lang)
+                    # Safe only if supported by complete official citation evidence
+                    safe = has_complete_evidence and (proposed is not None)
                     issues.append(
                         NameAuditIssue(
                             "ERROR",
@@ -160,15 +189,18 @@ def audit_place_names(places: list[dict[str, Any]]) -> list[NameAuditIssue]:
                             field=field_name,
                             current_value=val,
                             proposed_value=proposed,
-                            review_required=(proposed is None),
+                            review_required=(not safe),
                             source=canonical_source,
+                            source_url=canonical_url,
+                            evidence=canonical_evidence,
+                            classification="SEMANTIC_NAME_CHANGE",
                         )
                     )
 
             # 3. CJK script leakage check in target languages
-            # CJK is LEGITIMATE in local for Japan, but an error in tr or en
             if lang in ("tr", "en") and contains_cjk(val):
                 proposed = canonical_names.get(lang)
+                safe = has_complete_evidence and (proposed is not None)
                 issues.append(
                     NameAuditIssue(
                         "ERROR",
@@ -178,8 +210,11 @@ def audit_place_names(places: list[dict[str, Any]]) -> list[NameAuditIssue]:
                         field=field_name,
                         current_value=val,
                         proposed_value=proposed,
-                        review_required=(proposed is None),
+                        review_required=(not safe),
                         source=canonical_source,
+                        source_url=canonical_url,
+                        evidence=canonical_evidence,
+                        classification="SEMANTIC_NAME_CHANGE",
                     )
                 )
 
@@ -187,17 +222,23 @@ def audit_place_names(places: list[dict[str, Any]]) -> list[NameAuditIssue]:
             if canonical_names and lang in canonical_names:
                 expected_canonical = canonical_names[lang]
                 if val != expected_canonical:
+                    # Semantic discrepancy: require explicit review unless backed by complete official evidence
+                    safe = has_complete_evidence
                     issues.append(
                         NameAuditIssue(
-                            "INFO",
+                            "INFO" if safe else "WARNING",
                             "CANONICAL_NAME_DISCREPANCY",
-                            f"Name {val!r} differs from verified canonical name {expected_canonical!r}",
+                            f"Name {val!r} differs from canonical reference {expected_canonical!r}"
+                            + (" (OFFICIAL EVIDENCE ATTACHED)" if safe else " (EVIDENCE INSUFFICIENT - REVIEW REQUIRED)"),
                             poi_id=poi_id,
                             field=field_name,
                             current_value=val,
                             proposed_value=expected_canonical,
-                            review_required=False,
+                            review_required=(not safe),
                             source=canonical_source,
+                            source_url=canonical_url,
+                            evidence=canonical_evidence,
+                            classification="SEMANTIC_NAME_CHANGE",
                         )
                     )
 
@@ -217,6 +258,7 @@ def audit_place_names(places: list[dict[str, Any]]) -> list[NameAuditIssue]:
                             current_value=f"tr={name.get('tr')}, en={name.get('en')}",
                             proposed_value=None,
                             review_required=True,
+                            classification="SEMANTIC_NAME_CHANGE",
                         )
                     )
 

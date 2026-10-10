@@ -107,6 +107,75 @@ class CliTests(unittest.TestCase):
             sha_after = hashlib.sha256(test_file.read_bytes()).hexdigest()
             self.assertEqual(sha_before, sha_after)
 
+    def test_cli_fix_aborts_on_duplicate_poi_id(self):
+        """Pre-fix validation must abort if duplicate POI IDs exist."""
+        corrupted_data = {
+            "schemaVersion": 1,
+            "countryId": "country-tr-turkey",
+            "places": [
+                {
+                    "id": "poi-ist-hagia-sophia",
+                    "cityId": "tr-istanbul",
+                    "countryId": "country-tr-turkey",
+                    "name": {"tr": "Ayasofya", "en": "Hagia Sophia", "local": "Ayasofya"},
+                    "category": "history",
+                    "latitude": 41.0085,
+                    "longitude": 28.9802,
+                },
+                {
+                    "id": "poi-ist-hagia-sophia",  # Duplicate ID
+                    "cityId": "tr-istanbul",
+                    "countryId": "country-tr-turkey",
+                    "name": {"tr": "Ayasofya Camii", "en": "Hagia Sophia Mosque", "local": "Ayasofya"},
+                    "category": "history",
+                    "latitude": 41.0085,
+                    "longitude": 28.9802,
+                }
+            ]
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = pathlib.Path(tmpdir) / "dup_data.json"
+            orig_bytes = json.dumps(corrupted_data, indent=2).encode("utf-8")
+            test_file.write_bytes(orig_bytes)
+
+            captured_err = io.StringIO()
+            old_stderr = sys.stderr
+            try:
+                sys.stderr = captured_err
+                exit_code = main([
+                    "fix",
+                    "--input", str(test_file),
+                    "--apply"
+                ])
+            finally:
+                sys.stderr = old_stderr
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn("PRE-FIX ABORT: Duplicate POI ID detected", captured_err.getvalue())
+            # File must NOT have been touched
+            self.assertEqual(test_file.read_bytes(), orig_bytes)
+
+    def test_cli_fix_aborts_on_structural_errors(self):
+        """Pre-fix validation must abort on structural corruptions."""
+        corrupted_file = EXAMPLES_DIR / "invalid_corrupted.json"
+        orig_bytes = corrupted_file.read_bytes()
+
+        captured_err = io.StringIO()
+        old_stderr = sys.stderr
+        try:
+            sys.stderr = captured_err
+            exit_code = main([
+                "fix",
+                "--input", str(corrupted_file),
+                "--apply"
+            ])
+        finally:
+            sys.stderr = old_stderr
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("PRE-FIX ABORT", captured_err.getvalue())
+        self.assertEqual(corrupted_file.read_bytes(), orig_bytes)
+
 
 if __name__ == "__main__":
     unittest.main()

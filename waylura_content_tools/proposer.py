@@ -16,6 +16,9 @@ class ProposalRecord:
         reason: str,
         status: str,  # 'AUTO_SAFE' or 'REVIEW_REQUIRED'
         source: str | None = None,
+        source_url: str | None = None,
+        evidence: str | None = None,
+        classification: str = "SEMANTIC_NAME_CHANGE",
     ):
         self.poi_id = poi_id
         self.field = field
@@ -24,6 +27,9 @@ class ProposalRecord:
         self.reason = reason
         self.status = status
         self.source = source
+        self.source_url = source_url
+        self.evidence = evidence
+        self.classification = classification
 
     @property
     def diff(self) -> str:
@@ -46,6 +52,9 @@ class ProposalRecord:
             "reason": self.reason,
             "status": self.status,
             "source": self.source,
+            "sourceUrl": self.source_url,
+            "evidence": self.evidence,
+            "classification": self.classification,
             "diff": self.diff,
         }
 
@@ -69,6 +78,9 @@ def generate_proposals(issues: list[NameAuditIssue]) -> list[ProposalRecord]:
             reason=issue.message,
             status=status,
             source=issue.source,
+            source_url=issue.source_url,
+            evidence=issue.evidence,
+            classification=issue.classification,
         )
         proposals_by_key.setdefault(key, []).append(prop)
 

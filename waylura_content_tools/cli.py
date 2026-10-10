@@ -105,6 +105,12 @@ def handle_validate(args: argparse.Namespace) -> int:
     write_output(report, args.output)
 
     has_errors = any(f.severity == "ERROR" for f in findings)
+    if getattr(args, "strict", True):
+        # Strict validation fails on any ERROR or unverified source relation if sources required
+        if getattr(args, "require_sources", False):
+            has_unverified = any(f.issue_type in ("ORPHAN_SOURCE_ID", "SOURCES_UNCHECKED") for f in findings)
+            if has_unverified:
+                return 1
     return 1 if has_errors else 0
 
 
@@ -167,6 +173,48 @@ def handle_fix(args: argparse.Namespace) -> int:
         print(f"ERROR: Cannot load input: {e}", file=sys.stderr)
         return 1
 
+    try:
+        known_sources = load_sources_inventory(args.sources)
+    except Exception as e:
+        print(f"ERROR: Cannot load sources inventory: {e}", file=sys.stderr)
+        return 1
+
+    # =========================================================================
+    # 1. MANDATORY PRE-FIX DATA INTEGRITY VALIDATION
+    # Safety policy forbids executing fixes on structurally corrupted datasets
+    # or datasets with duplicate POI identities.
+    # =========================================================================
+    validation_findings = validate_dataset(
+        data,
+        known_sources=known_sources,
+        schema_adapter=args.schema,
+    )
+    duplicate_errors = [f for f in validation_findings if f.issue_type == "DUPLICATE_POI_ID"]
+    if duplicate_errors:
+        print(f"PRE-FIX ABORT: Duplicate POI ID detected in {path.name}:", file=sys.stderr)
+        for d in duplicate_errors:
+            print(f"  * {d.message}", file=sys.stderr)
+        print("Safety policy forbids modifying datasets with duplicate identity keys. File unchanged.", file=sys.stderr)
+        return 1
+
+    structural_errors = [f for f in validation_findings if f.severity == "ERROR"]
+    if structural_errors:
+        print(f"PRE-FIX ABORT: Found {len(structural_errors)} fatal structural error(s) in {path.name}:", file=sys.stderr)
+        for err in structural_errors:
+            loc = f" [{err.poi_id}]" if err.poi_id else ""
+            print(f"  * [{err.issue_type}]{loc} {err.message}", file=sys.stderr)
+        print("Safety policy forbids repairing structurally invalid datasets. File unchanged.", file=sys.stderr)
+        return 1
+
+    is_strict = not getattr(args, "lenient", False)
+    if is_strict and getattr(args, "require_sources", False):
+        unverified_sources = [f for f in validation_findings if f.issue_type in ("ORPHAN_SOURCE_ID", "SOURCES_UNCHECKED")]
+        if unverified_sources:
+            print(f"PRE-FIX ABORT (STRICT): Source verification required but unverified relations found in {path.name}:", file=sys.stderr)
+            for us in unverified_sources:
+                print(f"  * [{us.issue_type}] {us.message}", file=sys.stderr)
+            return 1
+
     raw_bytes = path.read_bytes()
     places = data.get("places", [])
     issues = audit_place_names(places)
@@ -174,6 +222,10 @@ def handle_fix(args: argparse.Namespace) -> int:
 
     is_dry_run = not args.apply or args.dry_run
     confirm_review = args.confirm_review or args.allow_review_required
+
+    if confirm_review:
+        print("[NOTICE] User passed --confirm-review: applying reviewed proposals.")
+        print("[NOTICE] (Note: This is a local CLI override and does NOT constitute an editorial signature or publishing approval receipt.)")
 
     result = apply_proposals_safely(
         data,
@@ -237,6 +289,12 @@ def handle_fix(args: argparse.Namespace) -> int:
         print(f"  Skipped (REVIEW REQUIRED or unverified): {len(result.skipped)}")
     if result.rejections:
         print(f"  Rejections: {len(result.rejections)}")
+
+    # Exit code contract: if critical rejections occurred, signal non-zero
+    has_critical_rejection = any(r.get("reason") in ("CONFLICTING_PROPOSALS", "STALE_PROPOSAL", "DUPLICATE_POI_ID") for r in result.rejections)
+    if has_critical_rejection:
+        print("WARNING: One or more proposals were rejected due to data conflicts or stale state.", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -257,6 +315,8 @@ def main(argv: list[str] | None = None) -> int:
         default="auto",
         help="Schema adapter type (auto, waylura-c0 with country object, or flat-poi with countryId)",
     )
+    p_val.add_argument("--strict", action="store_true", default=True, help="Strict validation (default)")
+    p_val.add_argument("--require-sources", action="store_true", help="Fail validation if sources are unverified")
     p_val.add_argument("--format", "-f", choices=["text", "json", "csv"], default="text", help="Output format")
     p_val.add_argument("--output", "-o", default=None, help="Save report to file")
     p_val.set_defaults(handler=handle_validate)
@@ -276,15 +336,25 @@ def main(argv: list[str] | None = None) -> int:
     p_prop.set_defaults(handler=handle_propose)
 
     # 4. fix
-    p_fix = subparsers.add_parser("fix", help="Surgically apply safe name fixes (dry-run by default)")
+    p_fix = subparsers.add_parser("fix", help="Surgically apply safe name fixes with pre-fix validation")
     p_fix.add_argument("--input", "-i", required=True, help="Input JSON file path")
     p_fix.add_argument("--output", "-o", default=None, help="Target output file (defaults to in-place update)")
     p_fix.add_argument("--apply", action="store_true", help="Actually write changes (default is dry-run)")
     p_fix.add_argument("--dry-run", action="store_true", help="Explicitly run in dry-run mode")
+    p_fix.add_argument("--sources", "-s", default=None, help="Path to registered sources inventory JSON")
+    p_fix.add_argument(
+        "--schema",
+        choices=["auto", "waylura-c0", "flat-poi"],
+        default="auto",
+        help="Schema adapter type",
+    )
+    p_fix.add_argument("--strict", action="store_true", default=True, help="Strict pre-fix validation (default)")
+    p_fix.add_argument("--lenient", action="store_true", help="Allow fixing if only non-fatal warnings exist")
+    p_fix.add_argument("--require-sources", action="store_true", help="Fail pre-fix check if sources are unverified")
     p_fix.add_argument(
         "--confirm-review",
         action="store_true",
-        help="Explicit human confirmation to apply proposals with REVIEW_REQUIRED status",
+        help="Explicit CLI user override to apply proposals with REVIEW_REQUIRED status",
     )
     p_fix.add_argument(
         "--allow-review-required",
