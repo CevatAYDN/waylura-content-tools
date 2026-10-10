@@ -1,0 +1,19 @@
+{
+  "sources": [
+    {
+      "id": "src-official-kultur-gov-tr",
+      "name": "T.C. Kültür ve Turizm Bakanlığı",
+      "url": "https://kulturportali.gov.tr"
+    },
+    {
+      "id": "src-official-jnto-go-jp",
+      "name": "Japan National Tourism Organization",
+      "url": "https://www.japan.travel"
+    },
+    {
+      "id": "src-unesco-whc",
+      "name": "UNESCO World Heritage Centre",
+      "url": "https://whc.unesco.org"
+    }
+  ]
+}

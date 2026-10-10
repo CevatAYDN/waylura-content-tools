@@ -5,30 +5,36 @@
 
 An open-source, deterministic Python CLI tool for **validating**, **auditing**, and **safely repairing** structured multilingual travel content datasets (JSON).
 
-Developed to ensure data integrity across multilingual travel guides (Turkish, English, and local scripts such as Japanese CJK) without accidental data corruption, script contamination, or unauthorized changes.
+Developed to ensure data integrity across multilingual travel guides (Turkish, English, and local scripts such as Japanese CJK) without accidental data corruption, script contamination, stale overwrites, or unauthorized mutations.
 
 ---
 
 ## Key Features
 
-1. **JSON Schema & Structural Validation (`validate`)**:
-   - Verifies schema version, country IDs, and place structure.
+1. **Explicit Schema Adapter & Structural Validation (`validate`)**:
+   - Supports both `waylura-c0` (production schema with root `country` object and `cities` array) and `flat-poi` schemas.
    - Enforces coordinate boundaries (`-90 <= lat <= 90`, `-180 <= lon <= 180`).
-   - Detects duplicate POI IDs and duplicate source records.
-   - Flags orphan `sourceId` and `canonicalNowCandidateId` references.
+   - Supports full category inventory: `history`, `food`, `transit`, `shopping`, `nature`, `culture`, `viewpoint`, `essentials`, `family`, `accommodation`, `activity`, `attraction`.
+   - Validates Country-City-POI hierarchy and references.
+   - Verifies `canonicalNowCandidateId` format (`<cc>-<city>-<node|way|rel>-<id>`) without confusing it with `places[].id`.
+   - Explicit `--sources` contract: Validates `sourceId` against registered sources inventory. When sources are omitted, reports unverified status honestly (`SOURCES_UNCHECKED`) instead of marking uninspected links as passing.
 2. **Multilingual Script & Quality Audit (`audit-names`)**:
-   - Detects foreign script scraping contamination (e.g., Cyrillic characters in Turkish/English/Japanese fields).
-   - Detects untranslated CJK characters in `tr` or `en` target language fields.
+   - Backed by versioned, sourced canonical reference dictionary (`waylura_content_tools/data/canonical_names_v1.json`).
+   - Resolves canonical naming for sensitive POIs (`Ninna-ji`, `Tō-ji`, `Kaleiçi`) with UNESCO and national tourism citations.
+   - Distinguishes legitimate local script usage (e.g. CJK in Japanese `local`) from script leakage in target language fields (`tr`, `en`).
+   - Flags Cyrillic and foreign script scraping residue.
    - Enforces Unicode NFC normalization.
-   - Flags semantic mismatches between POI IDs and names (e.g., transit station ID without station designation in name).
-3. **Deterministic Proposals & Diffs (`propose`)**:
+3. **Deterministic Proposals & Conflict Resolution (`propose`)**:
    - Emits structured diff proposals (`AUTO_SAFE` vs `REVIEW_REQUIRED`).
-   - Never alters files during proposal generation.
+   - Detects conflicting proposals targeting the same POI and field.
 4. **Safe, Surgical, Idempotent Fixer (`fix`)**:
    - **Dry-run by default:** No files are touched without `--apply`.
-   - **Surgical updates:** Updates ONLY specific target string fields (`name.tr`, `name.en`, `name.local`).
-   - **Data preservation:** Never modifies `id`, `category`, `latitude`, `longitude`, `cityId`, `sourceId`, or C0/C1/C2 approval statuses.
-   - **Idempotency:** Executing the tool repeatedly produces identical output and 0 further diffs.
+   - **Stale proposal protection:** Rejects modifications if active field value does not match `proposal.current_value`.
+   - **Conflict rejection:** Automatically rejects conflicting proposals for the same POI/field.
+   - **Human review guard:** Requires `--confirm-review` to apply any non-`AUTO_SAFE` proposals.
+   - **Zero-change preservation:** If 0 changes are applied, the file is never touched or rewritten, strictly preserving SHA-256 and mtime.
+   - **Atomic write & rollback:** Uses temporary file, fsync, and atomic `os.replace` to guarantee write durability.
+   - **Invariant guarantee:** Never modifies `id`, `category`, `latitude`, `longitude`, `cityId`, `sourceId`, or C0/C1/C2 approval statuses.
 
 ---
 
@@ -53,10 +59,13 @@ pip install -e .
 
 ### 1. Validate Structure & Schema
 ```powershell
-# Windows PowerShell
-python -m waylura_content_tools validate --input examples/valid_japan.json
+# Validate Waylura C0 production schema with sources inventory
+python -m waylura_content_tools validate `
+  --input examples/valid_waylura_c0_turkey.json `
+  --sources examples/sources.json `
+  --schema waylura-c0
 
-# Linux / macOS
+# Validate flat-poi schema
 python -m waylura_content_tools validate --input examples/valid_japan.json
 ```
 Returns exit code `0` on success, or `1` if structural errors are encountered.
@@ -77,8 +86,11 @@ python -m waylura_content_tools propose --input examples/fixable_sample.json --o
 # Dry-run (default: reports what WOULD change without touching disk)
 python -m waylura_content_tools fix --input examples/fixable_sample.json --dry-run
 
-# Apply safe changes in-place
+# Apply safe changes in-place with atomic replace
 python -m waylura_content_tools fix --input examples/fixable_sample.json --apply
+
+# Explicit human review confirmation for ambiguous proposals
+python -m waylura_content_tools fix --input examples/fixable_sample.json --apply --confirm-review
 
 # Or write repaired output to a new file
 python -m waylura_content_tools fix --input examples/fixable_sample.json --apply --output fixed.json
@@ -93,14 +105,14 @@ Run the full offline test suite:
 python -m unittest discover -s tests -v
 ```
 
-All 24 unit and deterministic acceptance tests run in milliseconds without network or external dependencies.
+All 34 unit, acceptance, and negative tests run in milliseconds without network or external dependencies.
 
 ---
 
 ## Safety & Governance Principles
 
-- **SOURCE AVAILABLE, TESTED, REPRODUCIBLE, RELEASE READY:** These statuses are evaluated independently.
-- **Fail-Closed on Unknowns:** Ambiguous translations or missing data are flagged as `REVIEW REQUIRED` and are NEVER automatically overwritten.
+- **SOURCE AVAILABLE, TESTED, REPRODUCIBLE, RELEASE READY:** Evaluated independently.
+- **Fail-Closed on Unknowns:** Ambiguous translations or missing data are flagged as `REVIEW_REQUIRED` and are NEVER automatically overwritten.
 - **No Private Data:** Synthetic, anonymous datasets are provided in `examples/`. The core Waylura mobile application codebase remains private.
 
 ---

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "waylura-content-tools"
-version = "1.0.0"
+version = "1.1.0"
 authors = [
   { name="Waylura Open Source Contributors" },
 ]
@@ -27,3 +27,6 @@ waylura-content-tools = "waylura_content_tools.cli:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["waylura_content_tools*"]
+
+[tool.setuptools.package-data]
+waylura_content_tools = ["data/*.json"]

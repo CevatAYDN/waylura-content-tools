@@ -1,69 +1,37 @@
 """Multilingual POI name quality, script leakage, and semantic auditor."""
 from __future__ import annotations
 
-import re
+import json
+from pathlib import Path
 from typing import Any
 from .unicode_utils import (
     contains_cjk,
     contains_cyrillic,
-    contains_latin,
     is_nfc,
     normalize_nfc,
 )
 
-# Canonical dictionary for well-known verified monuments and temples
-CANONICAL_NAMES: dict[str, dict[str, str]] = {
-    "poi-tky-sensoji": {
-        "tr": "Sensō-ji Tapınağı",
-        "en": "Sensō-ji",
-        "local": "金龍山 浅草寺",
-    },
-    "poi-kyo-kinkakuji": {
-        "tr": "Kinkaku-ji (Altın Köşk Tapınağı)",
-        "en": "Kinkaku-ji",
-        "local": "金閣寺",
-    },
-    "poi-kyo-ginkakuji": {
-        "tr": "Ginkaku-ji (Gümüş Köşk Tapınağı)",
-        "en": "Ginkakuji",
-        "local": "銀閣寺",
-    },
-    "poi-kyo-ninnaji": {
-        "tr": "Ninna-ji Tapınağı",
-        "en": "Ninna temple",
-        "local": "仁和寺",
-    },
-    "poi-kyo-toji": {
-        "tr": "Tō-ji Tapınağı",
-        "en": "East Temple",
-        "local": "東寺",
-    },
-    "poi-kyo-sanjusangendo": {
-        "tr": "Sanjūsangen-dō Tapınağı",
-        "en": "Sanjūsangen-dō",
-        "local": "三十三間堂",
-    },
-    "poi-ant-hadrians-gate": {
-        "tr": "Hadrian Kapısı (Üçkapılar)",
-        "en": "Hadrian's Gate",
-        "local": "Hadrian Kapısı (Üçkapılar)",
-    },
-    "poi-ant-kaleici-museum": {
-        "tr": "Suna & İnan Kıraç Kaleiçi Müzesi",
-        "en": "Suna & İnan Kıraç Kaleiçi Museum",
-        "local": "Suna & İnan Kıraç Kaleiçi Müzesi",
-    },
-    "poi-ant-archaeology-museum": {
-        "tr": "Antalya Arkeoloji Müzesi",
-        "en": "Antalya Archaeological Museum",
-        "local": "Antalya Arkeoloji Müzesi",
-    },
-    "poi-ant-ataturk-house": {
-        "tr": "Antalya Atatürk Evi Müzesi",
-        "en": "Antalya Atatürk House Museum",
-        "local": "Antalya Atatürk Evi Müzesi",
-    },
-}
+DATA_PATH = Path(__file__).resolve().parent / "data" / "canonical_names_v1.json"
+
+
+def load_canonical_registry() -> dict[str, dict[str, Any]]:
+    """Load canonical dictionary with aliases and source provenance."""
+    if not DATA_PATH.is_file():
+        return {}
+    try:
+        data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
+        entities = data.get("entities", {})
+        registry: dict[str, dict[str, Any]] = {}
+        for primary_id, record in entities.items():
+            registry[primary_id] = record
+            for alias in record.get("aliases", []):
+                registry[alias] = record
+        return registry
+    except Exception:
+        return {}
+
+
+CANONICAL_REGISTRY = load_canonical_registry()
 
 SEMANTIC_KEYWORD_RULES = [
     {
@@ -95,6 +63,7 @@ class NameAuditIssue:
         current_value: str,
         proposed_value: str | None = None,
         review_required: bool = False,
+        source: str | None = None,
     ):
         self.severity = severity
         self.issue_type = issue_type
@@ -104,6 +73,7 @@ class NameAuditIssue:
         self.current_value = current_value
         self.proposed_value = proposed_value
         self.review_required = review_required
+        self.source = source
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -115,6 +85,7 @@ class NameAuditIssue:
             "currentValue": self.current_value,
             "proposedValue": self.proposed_value,
             "reviewRequired": self.review_required,
+            "source": self.source,
         }
 
     def __repr__(self) -> str:
@@ -127,12 +98,17 @@ def audit_place_names(places: list[dict[str, Any]]) -> list[NameAuditIssue]:
 
     for place in places:
         poi_id = place.get("id") or "unknown"
+        city_id = place.get("cityId") or ""
+        country_id = place.get("countryId") or ""
+        is_japan = "jp" in country_id or city_id.startswith("jp-")
+
         name = place.get("name")
         if not isinstance(name, dict):
             continue
 
-        # Check canonical match
-        canonical = CANONICAL_NAMES.get(poi_id)
+        canonical_record = CANONICAL_REGISTRY.get(poi_id)
+        canonical_names = canonical_record.get("names", {}) if canonical_record else {}
+        canonical_source = canonical_record.get("source") if canonical_record else None
 
         for lang in ("tr", "en", "local"):
             val = name.get(lang)
@@ -152,14 +128,14 @@ def audit_place_names(places: list[dict[str, Any]]) -> list[NameAuditIssue]:
                 )
                 continue
 
-            # 1. Unicode NFC check
+            # 1. Unicode NFC normalization check
             if not is_nfc(val):
                 normalized = normalize_nfc(val)
                 issues.append(
                     NameAuditIssue(
                         "WARNING",
                         "UNICODE_NFC_DENORMALIZED",
-                        f"String in {field_name} is not in Unicode NFC normalization form",
+                        f"String in {field_name} is not in Unicode NFC form",
                         poi_id=poi_id,
                         field=field_name,
                         current_value=val,
@@ -169,44 +145,47 @@ def audit_place_names(places: list[dict[str, Any]]) -> list[NameAuditIssue]:
                 )
 
             # 2. Cyrillic script leakage check
+            # Cyrillic in Turkish, English, or Japanese places is an anomaly/scraping artifact
             if contains_cyrillic(val):
-                proposed = None
-                if canonical and lang in canonical:
-                    proposed = canonical[lang]
-                issues.append(
-                    NameAuditIssue(
-                        "ERROR",
-                        "CYRILLIC_SCRIPT_LEAKAGE",
-                        f"Unexpected Cyrillic script found in {field_name}: {val!r}",
-                        poi_id=poi_id,
-                        field=field_name,
-                        current_value=val,
-                        proposed_value=proposed,
-                        review_required=(proposed is None),
+                # If city is not in a Cyrillic locale, this is foreign leakage
+                is_cyrillic_locale = "ru" in country_id or "ua" in country_id or "bg" in country_id
+                if not is_cyrillic_locale or lang in ("tr", "en"):
+                    proposed = canonical_names.get(lang)
+                    issues.append(
+                        NameAuditIssue(
+                            "ERROR",
+                            "CYRILLIC_SCRIPT_LEAKAGE",
+                            f"Unexpected Cyrillic script found in {field_name}: {val!r}",
+                            poi_id=poi_id,
+                            field=field_name,
+                            current_value=val,
+                            proposed_value=proposed,
+                            review_required=(proposed is None),
+                            source=canonical_source,
+                        )
                     )
-                )
 
-            # 3. CJK leakage check in Turkish or English fields
+            # 3. CJK script leakage check in target languages
+            # CJK is LEGITIMATE in local for Japan, but an error in tr or en
             if lang in ("tr", "en") and contains_cjk(val):
-                proposed = None
-                if canonical and lang in canonical:
-                    proposed = canonical[lang]
+                proposed = canonical_names.get(lang)
                 issues.append(
                     NameAuditIssue(
                         "ERROR",
                         "UNTRANSLATED_CJK_IN_TARGET_LANGUAGE",
-                        f"Untranslated CJK characters found in {field_name}: {val!r}",
+                        f"Untranslated CJK characters found in target language {field_name}: {val!r}",
                         poi_id=poi_id,
                         field=field_name,
                         current_value=val,
                         proposed_value=proposed,
                         review_required=(proposed is None),
+                        source=canonical_source,
                     )
                 )
 
             # 4. Canonical discrepancy check
-            if canonical and lang in canonical:
-                expected_canonical = canonical[lang]
+            if canonical_names and lang in canonical_names:
+                expected_canonical = canonical_names[lang]
                 if val != expected_canonical:
                     issues.append(
                         NameAuditIssue(
@@ -218,6 +197,7 @@ def audit_place_names(places: list[dict[str, Any]]) -> list[NameAuditIssue]:
                             current_value=val,
                             proposed_value=expected_canonical,
                             review_required=False,
+                            source=canonical_source,
                         )
                     )
 

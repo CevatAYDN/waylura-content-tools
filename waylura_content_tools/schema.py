@@ -8,14 +8,26 @@ POI_ID_PATTERN = re.compile(r"^poi-[a-z0-9]+-[a-z0-9\-]+$")
 COUNTRY_ID_PATTERN = re.compile(r"^country-[a-z0-9\-]+$")
 CITY_ID_PATTERN = re.compile(r"^[a-z0-9\-]+$")
 SOURCE_ID_PATTERN = re.compile(r"^src-[a-z0-9\-]+$")
+CANONICAL_CANDIDATE_ID_PATTERN = re.compile(
+    r"^[a-z]{2}-[a-z0-9\-]+-(node|way|relation|place|area)-[0-9]+$"
+)
+
+SCHEMA_WAYLURA_C0 = "waylura-c0"
+SCHEMA_FLAT_POI = "flat-poi"
+SUPPORTED_SCHEMAS = {SCHEMA_WAYLURA_C0, SCHEMA_FLAT_POI}
 
 ALLOWED_CATEGORIES = {
+    # Waylura C0 production categories
     "history",
     "food",
-    "culture",
-    "transit",
     "nature",
     "shopping",
+    "transit",
+    "viewpoint",
+    "family",
+    "essentials",
+    # Extended travel guide categories
+    "culture",
     "accommodation",
     "activity",
     "attraction",
@@ -37,6 +49,22 @@ REQUIRED_NAME_FIELDS = {
     "en",
     "local",
 }
+
+REQUIRED_COUNTRY_FIELDS = {
+    "id",
+    "name",
+}
+
+
+def detect_schema(data: dict[str, Any]) -> str:
+    """Explicitly detect schema variant without silent conversion."""
+    if not isinstance(data, dict):
+        return "unknown"
+    if "country" in data and isinstance(data["country"], dict):
+        return SCHEMA_WAYLURA_C0
+    if "countryId" in data and isinstance(data["countryId"], str):
+        return SCHEMA_FLAT_POI
+    return "unknown"
 
 
 def validate_coordinates(lat: Any, lon: Any) -> list[str]:

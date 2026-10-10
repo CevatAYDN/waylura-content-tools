@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "dataVersion": "1.0.0",
+  "lastUpdated": "2026-10-10",
+  "description": "Versioned canonical travel landmark and monument names with official source attributions.",
+  "entities": {
+    "poi-tky-sensoji": {
+      "names": {
+        "tr": "Sensō-ji Tapınağı",
+        "en": "Sensō-ji",
+        "local": "金龍山 浅草寺"
+      },
+      "source": "JNTO (Japan National Tourism Organization) / Tokyo Metropolitan Tourism",
+      "status": "OFFICIAL_VERIFIED"
+    },
+    "poi-kyo-kinkakuji": {
+      "names": {
+        "tr": "Kinkaku-ji (Altın Köşk Tapınağı)",
+        "en": "Kinkaku-ji",
+        "local": "金閣寺"
+      },
+      "source": "Rinzai Zen Shokoku-ji branch / JNTO Kyoto Guide",
+      "status": "OFFICIAL_VERIFIED"
+    },
+    "poi-kyo-ginkakuji": {
+      "names": {
+        "tr": "Ginkaku-ji (Gümüş Köşk Tapınağı)",
+        "en": "Ginkaku-ji",
+        "local": "銀閣寺"
+      },
+      "source": "JNTO Kyoto Tourism Guide / Agency for Cultural Affairs (Bunkacho)",
+      "status": "OFFICIAL_VERIFIED"
+    },
+    "poi-kyo-ninnaji": {
+      "names": {
+        "tr": "Ninna-ji Tapınağı",
+        "en": "Ninna-ji",
+        "local": "仁和寺"
+      },
+      "notes": "Canonical English is Ninna-ji; 'Ninna temple' is raw literal translation",
+      "source": "UNESCO World Heritage / Ninna-ji Official / JNTO",
+      "status": "OFFICIAL_VERIFIED"
+    },
+    "poi-kyo-toji": {
+      "names": {
+        "tr": "Tō-ji Tapınağı",
+        "en": "Tō-ji",
+        "local": "東寺"
+      },
+      "notes": "Canonical English is Tō-ji; 'East Temple' is raw literal translation",
+      "source": "UNESCO World Heritage / Tō-ji Shingon Sect / JNTO",
+      "status": "OFFICIAL_VERIFIED"
+    },
+    "poi-kyo-sanjusangendo": {
+      "names": {
+        "tr": "Sanjūsangen-dō Tapınağı",
+        "en": "Sanjūsangen-dō",
+        "local": "三十三間堂"
+      },
+      "source": "JNTO / Kyoto Tourism Official Guide",
+      "status": "OFFICIAL_VERIFIED"
+    },
+    "poi-ayt-hadrians-gate": {
+      "aliases": ["poi-ant-hadrians-gate"],
+      "names": {
+        "tr": "Hadrian Kapısı (Üçkapılar)",
+        "en": "Hadrian's Gate",
+        "local": "Hadrian Kapısı (Üçkapılar)"
+      },
+      "source": "T.C. Kültür ve Turizm Bakanlığı Antalya İl Kültür Müdürlüğü",
+      "status": "OFFICIAL_VERIFIED"
+    },
+    "poi-ayt-suna-inan-kirac-kaleici-museum": {
+      "aliases": ["poi-ant-kaleici-museum"],
+      "names": {
+        "tr": "Suna & İnan Kıraç Kaleiçi Müzesi",
+        "en": "Suna & İnan Kıraç Kaleiçi Museum",
+        "local": "Suna & İnan Kıraç Kaleiçi Müzesi"
+      },
+      "source": "AKMED / Koç Üniversitesi Vehbi Koç Vakfı",
+      "status": "OFFICIAL_VERIFIED"
+    },
+    "poi-ayt-antalya-museum": {
+      "aliases": ["poi-ant-archaeology-museum"],
+      "names": {
+        "tr": "Antalya Arkeoloji Müzesi",
+        "en": "Antalya Archaeological Museum",
+        "local": "Antalya Arkeoloji Müzesi"
+      },
+      "source": "T.C. Kültür ve Turizm Bakanlığı Müzeler Genel Müdürlüğü",
+      "status": "OFFICIAL_VERIFIED"
+    },
+    "poi-ayt-ataturk-house-museum": {
+      "aliases": ["poi-ant-ataturk-house"],
+      "names": {
+        "tr": "Antalya Atatürk Evi Müzesi",
+        "en": "Antalya Atatürk House Museum",
+        "local": "Antalya Atatürk Evi Müzesi"
+      },
+      "source": "T.C. Kültür ve Turizm Bakanlığı",
+      "status": "OFFICIAL_VERIFIED"
+    }
+  }
+}

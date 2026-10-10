@@ -15,6 +15,7 @@ class ProposalRecord:
         proposed_value: str,
         reason: str,
         status: str,  # 'AUTO_SAFE' or 'REVIEW_REQUIRED'
+        source: str | None = None,
     ):
         self.poi_id = poi_id
         self.field = field
@@ -22,6 +23,7 @@ class ProposalRecord:
         self.proposed_value = proposed_value
         self.reason = reason
         self.status = status
+        self.source = source
 
     @property
     def diff(self) -> str:
@@ -43,36 +45,53 @@ class ProposalRecord:
             "proposedValue": self.proposed_value,
             "reason": self.reason,
             "status": self.status,
+            "source": self.source,
             "diff": self.diff,
         }
 
 
 def generate_proposals(issues: list[NameAuditIssue]) -> list[ProposalRecord]:
-    """Generate deterministic proposals from name audit issues."""
-    proposals: list[ProposalRecord] = []
-    seen: set[tuple[str, str]] = set()
+    """Generate deterministic proposals from name audit issues with conflict detection."""
+    proposals_by_key: dict[tuple[str, str], list[ProposalRecord]] = {}
 
     for issue in issues:
         if issue.proposed_value is None or issue.proposed_value == issue.current_value:
             continue
 
         key = (issue.poi_id, issue.field)
-        if key in seen:
-            continue
-        seen.add(key)
-
         status = "REVIEW_REQUIRED" if issue.review_required else "AUTO_SAFE"
-        proposals.append(
-            ProposalRecord(
-                poi_id=issue.poi_id,
-                field=issue.field,
-                current_value=issue.current_value,
-                proposed_value=issue.proposed_value,
-                reason=issue.message,
-                status=status,
-            )
+
+        prop = ProposalRecord(
+            poi_id=issue.poi_id,
+            field=issue.field,
+            current_value=issue.current_value,
+            proposed_value=issue.proposed_value,
+            reason=issue.message,
+            status=status,
+            source=issue.source,
         )
+        proposals_by_key.setdefault(key, []).append(prop)
+
+    result: list[ProposalRecord] = []
+    for key, props in proposals_by_key.items():
+        if len(props) == 1:
+            result.append(props[0])
+        else:
+            # Check if all proposed values are identical
+            unique_proposed = {p.proposed_value for p in props}
+            if len(unique_proposed) == 1:
+                # Merge reasons
+                combined_reason = "; ".join(p.reason for p in props)
+                p = props[0]
+                p.reason = combined_reason
+                result.append(p)
+            else:
+                # Conflict detected! Mark as CONFLICTING and force REVIEW_REQUIRED
+                for p in props:
+                    p.status = "CONFLICTING_REVIEW_REQUIRED"
+                    p.reason = f"Conflicting proposals exist for {p.poi_id}.{p.field}: {unique_proposed}"
+                    result.append(p)
 
     # Sort deterministically
-    proposals.sort(key=lambda p: (p.poi_id, p.field))
-    return proposals
+    result.sort(key=lambda p: (p.poi_id, p.field, p.proposed_value))
+    return result

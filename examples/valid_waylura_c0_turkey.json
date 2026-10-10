@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "publicationStatus": "PUBLISHED",
+  "country": {
+    "id": "country-tr-turkey",
+    "name": {
+      "tr": "Türkiye",
+      "en": "Turkey",
+      "local": "Türkiye"
+    }
+  },
+  "cities": [
+    {
+      "id": "tr-antalya",
+      "countryId": "country-tr-turkey",
+      "name": {
+        "tr": "Antalya",
+        "en": "Antalya",
+        "local": "Antalya"
+      }
+    },
+    {
+      "id": "tr-istanbul",
+      "countryId": "country-tr-turkey",
+      "name": {
+        "tr": "İstanbul",
+        "en": "Istanbul",
+        "local": "İstanbul"
+      }
+    }
+  ],
+  "places": [
+    {
+      "id": "poi-ayt-kaleici",
+      "cityId": "tr-antalya",
+      "countryId": "country-tr-turkey",
+      "name": {
+        "tr": "Kaleiçi",
+        "en": "Kaleiçi",
+        "local": "Kaleiçi"
+      },
+      "category": "history",
+      "latitude": 36.8841,
+      "longitude": 30.7056,
+      "sourceId": "src-official-kultur-gov-tr",
+      "canonicalNowCandidateId": "tr-antalya-node-100234"
+    },
+    {
+      "id": "poi-ayt-duden-waterfalls",
+      "cityId": "tr-antalya",
+      "countryId": "country-tr-turkey",
+      "name": {
+        "tr": "Düden Şelalesi",
+        "en": "Düden Waterfalls",
+        "local": "Düden Şelalesi"
+      },
+      "category": "nature",
+      "latitude": 36.8512,
+      "longitude": 30.7853,
+      "sourceId": "src-official-kultur-gov-tr",
+      "canonicalNowCandidateId": "tr-antalya-way-551022"
+    },
+    {
+      "id": "poi-ayt-tunektepe-teleferik",
+      "cityId": "tr-antalya",
+      "countryId": "country-tr-turkey",
+      "name": {
+        "tr": "Tünektepe Seyir Terası",
+        "en": "Tünektepe Viewpoint",
+        "local": "Tünektepe Seyir Terası"
+      },
+      "category": "viewpoint",
+      "latitude": 36.8322,
+      "longitude": 30.5898,
+      "sourceId": "src-official-kultur-gov-tr",
+      "canonicalNowCandidateId": "tr-antalya-node-998811"
+    },
+    {
+      "id": "poi-ist-galata-tower",
+      "cityId": "tr-istanbul",
+      "countryId": "country-tr-turkey",
+      "name": {
+        "tr": "Galata Kulesi",
+        "en": "Galata Tower",
+        "local": "Galata Kulesi"
+      },
+      "category": "viewpoint",
+      "latitude": 41.0256,
+      "longitude": 28.9741,
+      "sourceId": "src-unesco-whc",
+      "canonicalNowCandidateId": "tr-istanbul-node-400192"
+    }
+  ]
+}
