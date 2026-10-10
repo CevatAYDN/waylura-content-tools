@@ -52,6 +52,7 @@ def validate_dataset(
     known_sources: set[str] | None = None,
     schema_adapter: str | None = None,
     expected_schema: str | None = None,
+    require_sources: bool = False,
 ) -> list[ValidationFinding]:
     """Validate full content dataset against explicit schema contracts."""
     findings: list[ValidationFinding] = []
@@ -105,7 +106,7 @@ def validate_dataset(
                 if c_src not in known_sources:
                     findings.append(
                         ValidationFinding(
-                            "WARNING",
+                            "ERROR" if require_sources else "WARNING",
                             "ORPHAN_SOURCE_ID",
                             f"country.sourceId {c_src!r} not found in registered sources",
                             field="country.sourceId",
@@ -158,7 +159,7 @@ def validate_dataset(
                 if city_src not in known_sources:
                     findings.append(
                         ValidationFinding(
-                            "WARNING",
+                            "ERROR" if require_sources else "WARNING",
                             "ORPHAN_SOURCE_ID",
                             f"City {c_id} sourceId {city_src!r} not in registered sources",
                         )
@@ -168,9 +169,11 @@ def validate_dataset(
     if known_sources is None:
         findings.append(
             ValidationFinding(
-                "WARNING",
+                "ERROR" if require_sources else "WARNING",
                 "SOURCES_UNCHECKED",
-                "No registered sources inventory provided; sourceId relationships are unverified (not marked as pass)",
+                "Sources inventory is required in strict publication mode, but was not provided"
+                if require_sources
+                else "No registered sources inventory provided; sourceId relationships are unverified (not marked as pass)",
             )
         )
 
@@ -305,7 +308,7 @@ def validate_dataset(
             if source_id not in known_sources:
                 findings.append(
                     ValidationFinding(
-                        "WARNING",
+                        "ERROR" if require_sources else "WARNING",
                         "ORPHAN_SOURCE_ID",
                         f"Referenced sourceId {source_id!r} not found in registered sources inventory",
                         poi_id=poi_id,

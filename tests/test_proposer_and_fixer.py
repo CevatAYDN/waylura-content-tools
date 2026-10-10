@@ -197,6 +197,58 @@ class ProposerAndFixerTests(unittest.TestCase):
         self.assertFalse(res.is_changed)
         self.assertEqual(res.rejections[0]["reason"], "FORBIDDEN_FIELD")
 
+    def test_transactional_abort_on_mixed_proposals_with_fatal_rejection(self):
+        """Mixed batch: 1 valid proposal + 1 fatal rejection must abort ALL changes (0 partial writes)."""
+        valid_prop = ProposalRecord(
+            poi_id="poi-tky-sensoji",
+            field="name.tr",
+            current_value=self.dataset["places"][0]["name"]["tr"],
+            proposed_value="Sensō-ji Tapınağı (Valid Fix)",
+            reason="Valid fix",
+            status="AUTO_SAFE",
+        )
+        stale_prop = ProposalRecord(
+            poi_id="poi-tky-skytree",
+            field="name.tr",
+            current_value="WRONG_STALE_CURRENT_VALUE",
+            proposed_value="Tokyo Skytree (Should Not Apply)",
+            reason="Stale fix",
+            status="AUTO_SAFE",
+        )
+        res = apply_proposals_safely(self.dataset, [valid_prop, stale_prop])
+        self.assertTrue(res.transaction_aborted)
+        self.assertTrue(res.has_fatal_rejection)
+        self.assertEqual(len(res.applied), 0)
+        self.assertFalse(res.is_changed)
+        # Verify pristine data unchanged
+        self.assertEqual(
+            res.modified_data["places"][0]["name"]["tr"],
+            self.dataset["places"][0]["name"]["tr"],
+        )
+
+    def test_atomic_write_detects_external_toctou_modification(self):
+        """If file is modified externally before commit, atomic_write_dataset must abort."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            file_path = pathlib.Path(tmpdir) / "data.json"
+            orig_bytes = json.dumps(self.dataset, indent=2).encode("utf-8")
+            file_path.write_bytes(orig_bytes)
+            sha_before = hashlib.sha256(orig_bytes).hexdigest()
+
+            # External process modifies the file on disk
+            file_path.write_bytes(b'{"modified": "by external process"}')
+
+            # Attempt atomic write with expected_sha256=sha_before
+            with self.assertRaises(RuntimeError) as ctx:
+                atomic_write_dataset(
+                    file_path,
+                    self.dataset,
+                    is_changed=True,
+                    expected_sha256=sha_before,
+                )
+            self.assertIn("EXTERNAL_MODIFICATION_DETECTED", str(ctx.exception))
+            # Disk file must still have external process content
+            self.assertEqual(file_path.read_bytes(), b'{"modified": "by external process"}')
+
 
 if __name__ == "__main__":
     unittest.main()

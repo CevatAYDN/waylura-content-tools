@@ -98,9 +98,20 @@ python -m waylura_content_tools fix --input examples/fixable_sample.json --apply
 python -m waylura_content_tools fix --input examples/fixable_sample.json --apply --output fixed.json
 ```
 
-### Exit Code Contracts
-- `0`: Success (all checks passed, fixes applied cleanly, or zero changes required).
-- `1`: Validation error, pre-fix integrity abort (duplicate POI IDs or corrupted schema), unresolvable proposal conflicts, or invalid input.
+### Exit Code & Verification Contracts
+
+| Mode / Scenario | CLI Flags | Condition | Exit Code | Disk Effect |
+| :--- | :--- | :--- | :--- | :--- |
+| **Clean validation** | `validate` | Valid schema, valid coordinates, valid IDs | `0` | Read-only |
+| **Strict Publication Check** | `validate --require-sources` | Sources inventory missing (`SOURCES_UNCHECKED`) or orphan source ID (`ORPHAN_SOURCE_ID`) | `1` | Read-only |
+| **Lenient Validation** | `validate --lenient` | Non-fatal warnings present (unverified sources, format notices) | `0` | Read-only |
+| **Structural Corruption** | `validate` / `fix` | Duplicate POI ID, invalid root, schema mismatch, lat/lon out of bounds | `1` | Aborted, 0 writes |
+| **Clean Fix (1st Run)** | `fix --apply` | Valid proposals present, zero fatal rejections | `0` | Atomic replace commit |
+| **Idempotent Fix (2nd Run)** | `fix --apply` | Already canonical, 0 changes required | `0` | File untouched (SHA & mtime preserved) |
+| **Fatal Batch Rejection** | `fix --apply` | Any fatal rejection (`STALE_PROPOSAL`, `CONFLICTING_PROPOSALS`, `DUPLICATE_POI_ID`, `FORBIDDEN_FIELD`) | `1` | Aborted, 0 partial writes (SHA & mtime preserved) |
+| **Review-Required Skip** | `fix --apply` | Only non-fatal `REVIEW_REQUIRED` proposals (unconfirmed) | `0` | File untouched (SHA & mtime preserved) |
+| **Strict Publication Fix** | `fix --require-sources --apply` | Missing source inventory or orphan source IDs | `1` | Pre-fix abort, 0 writes |
+| **External Modification** | `fix --apply` | File modified on disk during execution (TOCTOU race detected) | `1` | Aborted, external disk content preserved |
 
 ---
 
@@ -111,7 +122,7 @@ Run the full offline test suite:
 python -m unittest discover -s tests -v
 ```
 
-All 40 unit, acceptance, and negative tests run in milliseconds without network or external dependencies.
+All 48 unit, acceptance, transactional regression, and CLI subprocess tests run in milliseconds without network or external dependencies.
 
 ---
 
