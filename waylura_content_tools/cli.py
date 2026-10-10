@@ -92,8 +92,7 @@ def handle_validate(args: argparse.Namespace) -> int:
         print(f"ERROR: Cannot load sources inventory: {e}", file=sys.stderr)
         return 1
 
-    is_lenient = getattr(args, "lenient", False)
-    require_sources = getattr(args, "require_sources", False) and not is_lenient
+    require_sources = bool(getattr(args, "require_sources", False))
 
     findings = validate_dataset(
         data,
@@ -112,10 +111,9 @@ def handle_validate(args: argparse.Namespace) -> int:
 
     write_output(report, args.output)
 
-    if is_lenient:
-        fatal_errors = [f for f in findings if f.issue_type in ("INVALID_ROOT_TYPE", "UNKNOWN_SCHEMA", "UNSUPPORTED_SCHEMA_VERSION", "SCHEMA_MISMATCH", "MISSING_PLACES_LIST")]
-        return 1 if fatal_errors else 0
-
+    # Any finding with severity ERROR (invalid coordinates, bad category, duplicate POI,
+    # missing required fields, broken schema, or unverified sources when --require-sources is active)
+    # is fatal in ALL modes (including --lenient). Lenient mode tolerates only non-fatal WARNING/INFO.
     has_errors = any(f.severity == "ERROR" for f in findings)
     return 1 if has_errors else 0
 
@@ -187,11 +185,13 @@ def handle_fix(args: argparse.Namespace) -> int:
 
     # =========================================================================
     # 1. MANDATORY PRE-FIX DATA INTEGRITY VALIDATION
-    # Safety policy forbids executing fixes on structurally corrupted datasets
-    # or datasets with duplicate POI identities or unverified sources in strict mode.
+    # Safety policy forbids executing fixes on corrupted or invalid datasets.
+    # INVALID_COORDINATES, INVALID_CATEGORY, DUPLICATE_POI_ID, missing required
+    # fields, and broken schemas are fatal in ALL modes (including --lenient).
+    # When --require-sources is active, unverified/orphan sources are also fatal.
+    # Lenient mode tolerates only non-fatal WARNING/INFO findings.
     # =========================================================================
-    is_lenient = getattr(args, "lenient", False)
-    require_sources = getattr(args, "require_sources", False) and not is_lenient
+    require_sources = bool(getattr(args, "require_sources", False))
 
     validation_findings = validate_dataset(
         data,
@@ -203,27 +203,19 @@ def handle_fix(args: argparse.Namespace) -> int:
     if duplicate_errors:
         print(f"PRE-FIX ABORT: Duplicate POI ID detected in {path.name}:", file=sys.stderr)
         for d in duplicate_errors:
-            print(f"  * {d.message}", file=sys.stderr)
+            print(f"  * [DUPLICATE_POI_ID] {d.message}", file=sys.stderr)
         print("Safety policy forbids modifying datasets with duplicate identity keys. File unchanged.", file=sys.stderr)
         return 1
 
-    if not is_lenient:
-        structural_errors = [f for f in validation_findings if f.severity == "ERROR"]
-        if structural_errors:
-            prefix = "PRE-FIX ABORT (STRICT PUBLICATION)" if require_sources else "PRE-FIX ABORT"
-            print(f"{prefix}: Found {len(structural_errors)} fatal error(s) in {path.name}:", file=sys.stderr)
-            for err in structural_errors:
-                loc = f" [{err.poi_id}]" if err.poi_id else ""
-                print(f"  * [{err.issue_type}]{loc} {err.message}", file=sys.stderr)
-            print("Safety policy forbids repairing datasets with validation errors. File unchanged.", file=sys.stderr)
-            return 1
-    else:
-        fatal_errors = [f for f in validation_findings if f.issue_type in ("INVALID_ROOT_TYPE", "UNKNOWN_SCHEMA", "UNSUPPORTED_SCHEMA_VERSION", "SCHEMA_MISMATCH", "MISSING_PLACES_LIST")]
-        if fatal_errors:
-            print(f"PRE-FIX ABORT (FATAL CORRUPTION): Found {len(fatal_errors)} fatal error(s) in {path.name}:", file=sys.stderr)
-            for err in fatal_errors:
-                print(f"  * [{err.issue_type}] {err.message}", file=sys.stderr)
-            return 1
+    fatal_errors = [f for f in validation_findings if f.severity == "ERROR"]
+    if fatal_errors:
+        prefix = "PRE-FIX ABORT (STRICT PUBLICATION)" if require_sources else "PRE-FIX ABORT"
+        print(f"{prefix}: Found {len(fatal_errors)} fatal error(s) in {path.name}:", file=sys.stderr)
+        for err in fatal_errors:
+            loc = f" [{err.poi_id}]" if err.poi_id else ""
+            print(f"  * [{err.issue_type}]{loc} {err.message}", file=sys.stderr)
+        print("Safety policy forbids repairing datasets with validation errors. File unchanged.", file=sys.stderr)
+        return 1
 
     raw_bytes = path.read_bytes()
     places = data.get("places", [])
@@ -330,7 +322,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Schema adapter type (auto, waylura-c0 with country object, or flat-poi with countryId)",
     )
     p_val.add_argument("--strict", action="store_true", default=True, help="Strict validation mode (default: True)")
-    p_val.add_argument("--lenient", action="store_true", help="Lenient developer mode: allow non-fatal warnings")
+    p_val.add_argument(
+        "--lenient",
+        action="store_true",
+        help="Lenient mode: tolerate non-fatal WARNING/INFO findings; fatal errors remain exit 1",
+    )
     p_val.add_argument(
         "--require-sources",
         action="store_true",
@@ -368,7 +364,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Schema adapter type",
     )
     p_fix.add_argument("--strict", action="store_true", default=True, help="Strict pre-fix validation mode (default: True)")
-    p_fix.add_argument("--lenient", action="store_true", help="Lenient developer mode: allow fixing if only non-fatal warnings exist")
+    p_fix.add_argument(
+        "--lenient",
+        action="store_true",
+        help="Lenient mode: tolerate non-fatal WARNING/INFO findings; fatal errors still abort with exit 1",
+    )
     p_fix.add_argument(
         "--require-sources",
         action="store_true",

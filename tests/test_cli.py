@@ -284,6 +284,221 @@ class CliTests(unittest.TestCase):
         ])
         self.assertEqual(exit_val, 0)
 
+    def test_cli_lenient_mode_rejects_corrupted_data_and_leaves_file_unmodified(self):
+        """Corrupted datasets must exit 1 in lenient mode and leave file untouched."""
+        # validate --lenient
+        exit_val = main([
+            "validate",
+            "--input", str(EXAMPLES_DIR / "invalid_corrupted.json"),
+            "--lenient",
+        ])
+        self.assertEqual(exit_val, 1)
+
+        # fix --lenient --apply
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = pathlib.Path(tmpdir) / "corrupt.json"
+            orig_bytes = (EXAMPLES_DIR / "invalid_corrupted.json").read_bytes()
+            test_file.write_bytes(orig_bytes)
+
+            captured_err = io.StringIO()
+            old_stderr = sys.stderr
+            try:
+                sys.stderr = captured_err
+                exit_fix = main([
+                    "fix",
+                    "--input", str(test_file),
+                    "--lenient",
+                    "--apply",
+                ])
+            finally:
+                sys.stderr = old_stderr
+
+            self.assertEqual(exit_fix, 1)
+            self.assertIn("PRE-FIX ABORT", captured_err.getvalue())
+            self.assertEqual(test_file.read_bytes(), orig_bytes)
+
+    def test_cli_lenient_mode_rejects_invalid_coordinates(self):
+        """Invalid coordinates must be fatal in lenient mode and leave file untouched."""
+        data = json.loads((EXAMPLES_DIR / "valid_japan.json").read_text(encoding="utf-8"))
+        data["places"][0]["latitude"] = 150.0  # Invalid latitude
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = pathlib.Path(tmpdir) / "bad_coords.json"
+            orig_bytes = json.dumps(data, indent=2).encode("utf-8")
+            test_file.write_bytes(orig_bytes)
+
+            exit_val = main(["validate", "--input", str(test_file), "--lenient"])
+            self.assertEqual(exit_val, 1)
+
+            captured_err = io.StringIO()
+            old_stderr = sys.stderr
+            try:
+                sys.stderr = captured_err
+                exit_fix = main(["fix", "--input", str(test_file), "--lenient", "--apply"])
+            finally:
+                sys.stderr = old_stderr
+
+            self.assertEqual(exit_fix, 1)
+            self.assertIn("INVALID_COORDINATES", captured_err.getvalue())
+            self.assertEqual(test_file.read_bytes(), orig_bytes)
+
+    def test_cli_lenient_mode_rejects_invalid_category(self):
+        """Invalid category must be fatal in lenient mode and leave file untouched."""
+        data = json.loads((EXAMPLES_DIR / "valid_japan.json").read_text(encoding="utf-8"))
+        data["places"][0]["category"] = "unsupported_category_name"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = pathlib.Path(tmpdir) / "bad_cat.json"
+            orig_bytes = json.dumps(data, indent=2).encode("utf-8")
+            test_file.write_bytes(orig_bytes)
+
+            exit_val = main(["validate", "--input", str(test_file), "--lenient"])
+            self.assertEqual(exit_val, 1)
+
+            captured_err = io.StringIO()
+            old_stderr = sys.stderr
+            try:
+                sys.stderr = captured_err
+                exit_fix = main(["fix", "--input", str(test_file), "--lenient", "--apply"])
+            finally:
+                sys.stderr = old_stderr
+
+            self.assertEqual(exit_fix, 1)
+            self.assertIn("INVALID_CATEGORY", captured_err.getvalue())
+            self.assertEqual(test_file.read_bytes(), orig_bytes)
+
+    def test_cli_lenient_mode_rejects_duplicate_poi_id(self):
+        """Duplicate POI IDs must be fatal in lenient mode and leave file untouched."""
+        data = json.loads((EXAMPLES_DIR / "valid_japan.json").read_text(encoding="utf-8"))
+        data["places"].append(data["places"][0])  # Duplicate
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = pathlib.Path(tmpdir) / "dup.json"
+            orig_bytes = json.dumps(data, indent=2).encode("utf-8")
+            test_file.write_bytes(orig_bytes)
+
+            exit_val = main(["validate", "--input", str(test_file), "--lenient"])
+            self.assertEqual(exit_val, 1)
+
+            captured_err = io.StringIO()
+            old_stderr = sys.stderr
+            try:
+                sys.stderr = captured_err
+                exit_fix = main(["fix", "--input", str(test_file), "--lenient", "--apply"])
+            finally:
+                sys.stderr = old_stderr
+
+            self.assertEqual(exit_fix, 1)
+            self.assertIn("DUPLICATE_POI_ID", captured_err.getvalue())
+            self.assertEqual(test_file.read_bytes(), orig_bytes)
+
+    def test_cli_lenient_mode_rejects_missing_required_fields(self):
+        """Missing required fields must be fatal in lenient mode and leave file untouched."""
+        data = json.loads((EXAMPLES_DIR / "valid_japan.json").read_text(encoding="utf-8"))
+        del data["places"][0]["latitude"]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = pathlib.Path(tmpdir) / "missing_fields.json"
+            orig_bytes = json.dumps(data, indent=2).encode("utf-8")
+            test_file.write_bytes(orig_bytes)
+
+            exit_val = main(["validate", "--input", str(test_file), "--lenient"])
+            self.assertEqual(exit_val, 1)
+
+            captured_err = io.StringIO()
+            old_stderr = sys.stderr
+            try:
+                sys.stderr = captured_err
+                exit_fix = main(["fix", "--input", str(test_file), "--lenient", "--apply"])
+            finally:
+                sys.stderr = old_stderr
+
+            self.assertEqual(exit_fix, 1)
+            self.assertIn("MISSING_REQUIRED_FIELDS", captured_err.getvalue())
+            self.assertEqual(test_file.read_bytes(), orig_bytes)
+
+    def test_cli_require_sources_with_lenient_preserves_security_check(self):
+        """Combining --require-sources with --lenient must NEVER disable source verification."""
+        # 1. Missing sources inventory must fail even with --lenient
+        exit_val = main([
+            "validate",
+            "--input", str(EXAMPLES_DIR / "valid_japan.json"),
+            "--require-sources",
+            "--lenient",
+        ])
+        self.assertEqual(exit_val, 1)
+
+        # 2. Fix with missing sources must abort even with --lenient
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = pathlib.Path(tmpdir) / "data.json"
+            orig_bytes = (EXAMPLES_DIR / "valid_japan.json").read_bytes()
+            test_file.write_bytes(orig_bytes)
+
+            captured_err = io.StringIO()
+            old_stderr = sys.stderr
+            try:
+                sys.stderr = captured_err
+                exit_fix = main([
+                    "fix",
+                    "--input", str(test_file),
+                    "--require-sources",
+                    "--lenient",
+                    "--apply",
+                ])
+            finally:
+                sys.stderr = old_stderr
+
+            self.assertEqual(exit_fix, 1)
+            self.assertIn("PRE-FIX ABORT", captured_err.getvalue())
+            self.assertEqual(test_file.read_bytes(), orig_bytes)
+
+        # 3. Orphan source ID must fail even with --lenient
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = pathlib.Path(tmpdir) / "orphan.json"
+            data = json.loads((EXAMPLES_DIR / "valid_japan.json").read_text(encoding="utf-8"))
+            data["places"][0]["sourceId"] = "unregistered-orphan-id"
+            orig_bytes = json.dumps(data, indent=2).encode("utf-8")
+            test_file.write_bytes(orig_bytes)
+
+            exit_val2 = main([
+                "validate",
+                "--input", str(test_file),
+                "--sources", str(EXAMPLES_DIR / "sources.json"),
+                "--require-sources",
+                "--lenient",
+            ])
+            self.assertEqual(exit_val2, 1)
+
+            captured_err = io.StringIO()
+            old_stderr = sys.stderr
+            try:
+                sys.stderr = captured_err
+                exit_fix2 = main([
+                    "fix",
+                    "--input", str(test_file),
+                    "--sources", str(EXAMPLES_DIR / "sources.json"),
+                    "--require-sources",
+                    "--lenient",
+                    "--apply",
+                ])
+            finally:
+                sys.stderr = old_stderr
+
+            self.assertEqual(exit_fix2, 1)
+            self.assertIn("ORPHAN_SOURCE_ID", captured_err.getvalue())
+            self.assertEqual(test_file.read_bytes(), orig_bytes)
+
+        # 4. Valid sources with --require-sources and --lenient passes
+        exit_val3 = main([
+            "validate",
+            "--input", str(EXAMPLES_DIR / "valid_waylura_c0_turkey.json"),
+            "--sources", str(EXAMPLES_DIR / "sources.json"),
+            "--schema", "waylura-c0",
+            "--require-sources",
+            "--lenient",
+        ])
+        self.assertEqual(exit_val3, 0)
+
     def test_cli_transactional_abort_on_mixed_fatal_proposal_preserves_file(self):
         """When proposals contain 1 valid proposal + 1 fatal rejection, transaction aborts completely with exit 1."""
         from waylura_content_tools.proposer import ProposalRecord
