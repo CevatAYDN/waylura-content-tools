@@ -14,6 +14,19 @@ from .proposer import generate_proposals
 from .reporter import format_csv_report, format_json_report, format_text_report
 from .validator import validate_dataset
 
+# Ensure UTF-8 output on Windows consoles (prevents cp1254/cp1252 crash on CJK and macron characters)
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+
 
 def file_sha256(path: Path) -> str:
     """Compute sha256 of file bytes."""
